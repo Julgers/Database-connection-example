@@ -2,112 +2,96 @@
 using BattleBitAPI.Common;
 using BattleBitAPI.Server;
 using System.Threading.Channels;
-using System.Xml;
+using CommunityServerAPI.Models;
+using CommunityServerAPI.Repositories;
 
 class Program
 {
+    public static PlayerRepository Player;
+    public static BannedWeaponRepository BannedWeapons;
+
     static void Main(string[] args)
     {
+        // Database connection
+        using (var dbContext = new DatabaseContext())
+        {
+            // Initiate repositories
+            Player = new PlayerRepository(dbContext);
+            BannedWeapons = new BannedWeaponRepository(dbContext);
+        }
+
         var listener = new ServerListener<MyPlayer, MyGameServer>();
         listener.Start(29294);
 
         Thread.Sleep(-1);
     }
 }
+
 class MyPlayer : Player<MyPlayer>
 {
-    public bool IsZombie;
 }
+
 class MyGameServer : GameServer<MyPlayer>
 {
+    public override async Task<bool> OnPlayerTypedMessage(MyPlayer author, ChatChannel channel, string message)
+    {
+        // Here we make commands like "!banweapon M4A1" etc. to ban and unban weapons.
+        // These commands use our repository to put and remove them from the database.
+        // returning true means putting the message in chat, false for not putting it in chat.
 
-    public override async Task OnRoundStarted()
-    {
-    }
-    public override async Task OnRoundEnded()
-    {
-    }
+        if (author.SteamID != 123456789 || !message.StartsWith("!")) return true; // Whatever checks you want to do.
 
-    public override async Task OnPlayerConnected(MyPlayer player)
-    {
-        bool anyZombiePlayer = false;
-        foreach (var item in AllPlayers)
+        var words = message.Split(" ");
+        switch (words[0])
         {
-            if (item.IsZombie)
-            {
-                anyZombiePlayer = true;
+            case "!banweapon":
+                if (!await Program.BannedWeapons.ExistsAsync(words[1]))
+                {
+                    await Program.BannedWeapons.CreateAsync(new BannedWeapon { Name = words[1] });
+                }
                 break;
-            }
-        }
 
-        if (!anyZombiePlayer)
-        {
-            player.IsZombie = true;
-            player.Message("You are the zombie.");
-            player.Kill();
+            case "!unbanweapon":
+                if (await Program.BannedWeapons.ExistsAsync(words[1]))
+                {
+                    await Program.BannedWeapons.DeleteAsync(new BannedWeapon { Name = words[1] });
+                }
+
+                break;
         }
+        
+        return false;
     }
-
-    public override async Task OnAPlayerKilledAnotherPlayer(OnPlayerKillArguments<MyPlayer> args)
+    
+    public override async Task OnSavePlayerStats(ulong steamId, PlayerStats stats)
     {
-        if (args.Victim.IsZombie)
+        // Check if there's already an entry in the DB, if so, update it, otherwise, create one.
+        var player = new ServerPlayer { steamId = steamId, stats = stats };
+        if (await Program.Player.ExistsAsync(steamId))
         {
-            args.Victim.IsZombie = false;
-            args.Victim.Message("You are no longer zombie");
-
-            AnnounceShort("Choosing new zombie in 5");
-            await Task.Delay(1000);
-            AnnounceShort("Choosing new zombie in 4");
-            await Task.Delay(1000);
-            AnnounceShort("Choosing new zombie in 3");
-            await Task.Delay(1000);
-            AnnounceShort("Choosing new zombie in 2");
-            await Task.Delay(1000);
-            AnnounceShort("Choosing new zombie in 1");
-            await Task.Delay(1000);
-
-            args.Killer.IsZombie = true;
-            args.Killer.SetHeavyGadget(Gadgets.SledgeHammer.ToString(), 0, true);
-
-            var position = args.Killer.GetPosition();
+            await Program.Player.UpdateAsync(player);
+        }
+        else
+        {
+            await Program.Player.CreateAsync(player);
         }
     }
 
+    public override async Task<PlayerStats> OnGetPlayerStats(ulong steamId, PlayerStats officialStats)
+        // Here we try to get the player out of the database. Return a new PlayersStats() if null, otherwise
+        // we will put player in a variable and return its stats.
+        => await Program.Player.FindAsync(steamId) switch
+        {
+            null => new PlayerStats(),
+            var player => player.stats
+        };
 
     public override async Task<OnPlayerSpawnArguments> OnPlayerSpawning(MyPlayer player, OnPlayerSpawnArguments request)
     {
-        if (player.IsZombie)
-        {
-            request.Loadout.PrimaryWeapon = default;
-            request.Loadout.SecondaryWeapon = default;
-            request.Loadout.LightGadget = null;
-            request.Loadout.HeavyGadget = Gadgets.SledgeHammer;
-            request.Loadout.Throwable = null;
-        }
+        // Check if the it's in the banned weapons table, if so, we don't allow it.
+        if (await Program.BannedWeapons.ExistsAsync(request.Loadout.PrimaryWeapon.Tool.Name))
+            request.Loadout.PrimaryWeapon.Tool = null;
 
         return request;
-    }
-    public override async Task OnPlayerSpawned(MyPlayer player)
-    {
-        if(player.IsZombie)
-        {
-            player.SetRunningSpeedMultiplier(2f);
-            player.SetJumpMultiplier(2f);
-            player.SetFallDamageMultiplier(0f);
-            player.SetReceiveDamageMultiplier(0.1f);
-            player.SetGiveDamageMultiplier(4f);
-        }
-    }
-
-
-
-    public override async Task OnConnected()
-    {
-        await Console.Out.WriteLineAsync("Current state: " + RoundSettings.State);
-
-    }
-    public override async Task OnGameStateChanged(GameState oldState, GameState newState)
-    {
-        await Console.Out.WriteLineAsync("State changed to -> " + newState);
     }
 }
