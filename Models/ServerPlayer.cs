@@ -9,7 +9,7 @@ public class ServerPlayer
 {
     // Remove auto increment etc.
     [DatabaseGenerated(DatabaseGeneratedOption.None)]
-    public ulong steamId;
+    public ulong steamId { get; set; }
     
-    public PlayerStats stats;
+    public PlayerStats stats { get; set; }
 }

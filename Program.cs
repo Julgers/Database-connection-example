@@ -1,47 +1,25 @@
 ﻿using BattleBitAPI;
 using BattleBitAPI.Common;
 using BattleBitAPI.Server;
-using CommunityServerAPI;
 using CommunityServerAPI.Models;
 using CommunityServerAPI.Repositories;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 class Program
 {
     static void Main(string[] args)
     {
-        var builder = InteractableServiceProvider.Builder.ConfigureServices(services =>
+        var listener = new ServerListener<MyPlayer, MyGameServer>();
+        
+        // Auto apply any pending migrations on startup.
+        using (var context = new DatabaseContext())
         {
-            services.AddLogging();
-            services.AddDbContext<DatabaseContext>((ServiceProvider, options) =>
-            {
-                // Allows for automatic inclusion of relations
-                options.UseLazyLoadingProxies();
-                
-                // Here we connect to our database with a connection string.
-                // Do not store your connection string in the code like this for production: Use environment variables or some other secret management instead.
-                const string dbConnectionString = "server=localhost;port=3306;database=commapi;user=root;password=";
-                options.UseMySql(dbConnectionString, ServerVersion.AutoDetect(dbConnectionString));
-            });
-            
-            services.AddScoped<PlayerRepository>();
-            services.AddScoped<BannedWeaponRepository>();
-        });
-        
-        var app = builder.Build();
-        
-        InteractableServiceProvider.Services = app.Services.GetRequiredService<IServiceScopeFactory>();
-        
-        // Auto migrate on startup
-        using (var serviceScope = app.Services.GetRequiredService<IServiceScopeFactory>().CreateScope())
-        {
-            var context = serviceScope.ServiceProvider.GetService<DatabaseContext>();
-            context?.Database.Migrate();
+            context.Database.Migrate();
         }
         
-        app.Run();
+        listener.Start(29294);
+
+        Thread.Sleep(-1);
     }
 }
 
@@ -51,18 +29,7 @@ class MyPlayer : Player<MyPlayer>
 
 class MyGameServer : GameServer<MyPlayer>
 {
-    private readonly PlayerRepository _player;
-    private readonly BannedWeaponRepository _bannedWeapon;
 
-    public MyGameServer()
-    {
-        using (var scope = InteractableServiceProvider.Services.CreateScope())
-        {
-            _player = scope.ServiceProvider.GetService<PlayerRepository>();
-            _bannedWeapon = scope.ServiceProvider.GetService<BannedWeaponRepository>();
-        }
-    }
-    
     public override async Task OnConnected()
     {
         Console.WriteLine($"Gameserver connected! {this.GameIP}:{this.GamePort}");
@@ -77,23 +44,29 @@ class MyGameServer : GameServer<MyPlayer>
         if (author.SteamID != 76561198173566107 || !message.StartsWith("!")) return true; // Whatever checks you want to do.
 
         var words = message.Split(" ");
-        switch (words[0])
+
+        using (var context = new DatabaseContext())
+        {
+            var bannedWeapons = new BannedWeaponRepository(context);
+            switch (words[0])
             {
                 case "!banweapon":
-                    if (!await _bannedWeapon.ExistsAsync(words[1]))
+                    if (!await bannedWeapons.ExistsAsync(words[1]))
                     {
-                        await _bannedWeapon.CreateAsync(new BannedWeapon { Name = words[1] });
+                        await bannedWeapons.CreateAsync(new BannedWeapon { Name = words[1] });
                     }
                     break;
 
                 case "!unbanweapon":
-                    if (await _bannedWeapon.ExistsAsync(words[1]))
+                    if (await bannedWeapons.ExistsAsync(words[1]))
                     {
-                        await _bannedWeapon.DeleteAsync(new BannedWeapon { Name = words[1] });
+                        await bannedWeapons.DeleteAsync(new BannedWeapon { Name = words[1] });
                     }
 
                     break;
             }
+        }
+        
 
         return false;
     }
@@ -102,14 +75,17 @@ class MyGameServer : GameServer<MyPlayer>
     {
         var player = new ServerPlayer { steamId = steamId, stats = stats };
         // Check if there's already an entry in the DB, if so, update it, otherwise, create one.
-
-        if (await _player.ExistsAsync(steamId))
+        using (var context = new DatabaseContext())
         {
-            await _player.UpdateAsync(player);
-        }
-        else
-        {
-            await _player.CreateAsync(player);
+            var players = new PlayerRepository(context);
+            if (await players.ExistsAsync(steamId))
+            {
+                await players.UpdateAsync(player);
+            }
+            else
+            {
+                await players.CreateAsync(player);
+            }
         }
     }
 
@@ -117,18 +93,26 @@ class MyGameServer : GameServer<MyPlayer>
         // Here we try to get the player out of the database. Return a new PlayersStats() if null, otherwise
         // we will put player in a variable and return its stats.
     {
-        return await _player.FindAsync(steamId) switch
+        using (var context = new DatabaseContext())
         {
-            null => new PlayerStats(),
-            var player => player.stats
-        };
+            var players = new PlayerRepository(context);
+            return await players.FindAsync(steamId) switch
+            {
+                null => new PlayerStats(),
+                var player => player.stats
+            };
+        }
     }
     
     public override async Task<OnPlayerSpawnArguments> OnPlayerSpawning(MyPlayer player, OnPlayerSpawnArguments request)
     {
         // Check if the it's in the banned weapons table, if so, we don't allow it.
-        if (await _bannedWeapon.ExistsAsync(request.Loadout.PrimaryWeapon.Tool.Name))
-            request.Loadout.PrimaryWeapon.Tool = null;
+        using (var context = new DatabaseContext())
+        {
+            var bannedWeapons = new BannedWeaponRepository(context);
+            if (await bannedWeapons.ExistsAsync(request.Loadout.PrimaryWeapon.Tool.Name))
+                request.Loadout.PrimaryWeapon.Tool = default;
+        }
 
         return request;
     }
