@@ -32,10 +32,8 @@ public class PlayerRepository : IRepository<ServerPlayer, ulong>
     
     public async Task<bool> ExistsAsync(ulong steamId)
         => await _context.Player.AnyAsync(p => p.steamId == steamId);
-
+    
     public async Task<ServerPlayer?> FindAsync(ulong steamId)
-    {
-        return await _context.Player.FirstOrDefaultAsync(p => p.steamId == steamId);
-    }
+        => await _context.Player.FirstOrDefaultAsync(p => p.steamId == steamId);
 
 }
