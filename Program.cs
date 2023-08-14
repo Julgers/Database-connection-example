@@ -45,28 +45,27 @@ class MyGameServer : GameServer<MyPlayer>
 
         var words = message.Split(" ");
 
-        using (var context = new DatabaseContext())
-        {
-            var bannedWeapons = new BannedWeaponRepository(context);
-            switch (words[0])
-            {
-                case "!banweapon":
-                    if (!await bannedWeapons.ExistsAsync(words[1]))
-                    {
-                        await bannedWeapons.CreateAsync(new BannedWeapon { Name = words[1] });
-                    }
-                    break;
-
-                case "!unbanweapon":
-                    if (await bannedWeapons.ExistsAsync(words[1]))
-                    {
-                        await bannedWeapons.DeleteAsync(new BannedWeapon { Name = words[1] });
-                    }
-
-                    break;
-            }
-        }
+        // `Using` makes sure it gets disposed correctly (when the variable falls out of scope).
+        // We need to await it to make sure everything is finished before disposing.
+        await using var bannedWeapons = new BannedWeaponRepository();
         
+        switch (words[0])
+        {
+            case "!banweapon":
+                if (!await bannedWeapons.ExistsAsync(words[1]))
+                {
+                    await bannedWeapons.CreateAsync(new BannedWeapon { Name = words[1] });
+                }
+                break;
+
+            case "!unbanweapon":
+                if (await bannedWeapons.ExistsAsync(words[1]))
+                {
+                    await bannedWeapons.DeleteAsync(new BannedWeapon { Name = words[1] });
+                }
+
+                break;
+        }
 
         return false;
     }
@@ -75,44 +74,47 @@ class MyGameServer : GameServer<MyPlayer>
     {
         var player = new ServerPlayer { steamId = steamId, stats = stats };
         // Check if there's already an entry in the DB, if so, update it, otherwise, create one.
-        using (var context = new DatabaseContext())
+        
+        // `Using` makes sure it gets disposed correctly (when the variable falls out of scope).
+        // We need to await it to make sure everything is finished before disposing.
+        await using var players = new PlayerRepository();
+        
+        if (await players.ExistsAsync(steamId))
         {
-            var players = new PlayerRepository(context);
-            if (await players.ExistsAsync(steamId))
-            {
-                await players.UpdateAsync(player);
-            }
-            else
-            {
-                await players.CreateAsync(player);
-            }
+            await players.UpdateAsync(player);
         }
+        else
+        {
+            await players.CreateAsync(player);
+        }
+        
     }
-
+    
     public override async Task<PlayerStats> OnGetPlayerStats(ulong steamId, PlayerStats officialStats)
         // Here we try to get the player out of the database. Return a new PlayersStats() if null, otherwise
         // we will put player in a variable and return its stats.
     {
-        using (var context = new DatabaseContext())
+        // `Using` makes sure it gets disposed correctly (when the variable falls out of scope).
+        // We need to await it to make sure everything is finished before disposing.
+        await using var players = new PlayerRepository();
+        
+        return await players.FindAsync(steamId) switch
         {
-            var players = new PlayerRepository(context);
-            return await players.FindAsync(steamId) switch
-            {
-                null => new PlayerStats(),
-                var player => player.stats
-            };
-        }
+            null => new PlayerStats(),
+            var player => player.stats
+        };
     }
     
     public override async Task<OnPlayerSpawnArguments> OnPlayerSpawning(MyPlayer player, OnPlayerSpawnArguments request)
     {
         // Check if the it's in the banned weapons table, if so, we don't allow it.
-        using (var context = new DatabaseContext())
-        {
-            var bannedWeapons = new BannedWeaponRepository(context);
-            if (await bannedWeapons.ExistsAsync(request.Loadout.PrimaryWeapon.Tool.Name))
-                request.Loadout.PrimaryWeapon.Tool = default;
-        }
+        
+        // `Using` makes sure it gets disposed correctly (when the variable falls out of scope).
+        // We need to await it to make sure everything is finished before disposing.
+        await using var bannedWeapons = new BannedWeaponRepository();
+        
+        if (await bannedWeapons.ExistsAsync(request.Loadout.PrimaryWeapon.Tool.Name))
+            request.Loadout.PrimaryWeapon.Tool = default;
 
         return request;
     }
