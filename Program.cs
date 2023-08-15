@@ -21,15 +21,17 @@ class Program
 
         Thread.Sleep(-1);
     }
+
+
 }
 
 class MyPlayer : Player<MyPlayer>
 {
+
 }
 
 class MyGameServer : GameServer<MyPlayer>
 {
-
     public override async Task OnConnected()
     {
         Console.WriteLine($"Gameserver connected! {this.GameIP}:{this.GamePort}");
