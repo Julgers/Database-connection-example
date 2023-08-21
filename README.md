@@ -7,4 +7,4 @@ for the [BattleBit Community API](https://github.com/MrOkiDoki/BattleBit-Communi
 Features:
 - !banweapon & !unbanweapon commands that save to DB, where it checks the DB on every spawn request to see if a weapon is allowed.
 - Gameserver whitelist in DB that stores the token for every IP+port combination.
-- Saving player stats / progression to DB.
+- Saving and pulling player stats / progression to and from DB.
