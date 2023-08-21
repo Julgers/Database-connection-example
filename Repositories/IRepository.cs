@@ -1,4 +1,4 @@
-﻿namespace CommunityServerAPI.Repositories;
+﻿namespace DatabaseExample.Repositories;
 
 /*
  * This repository interface serves as an abstraction of repository objects in some storage system.

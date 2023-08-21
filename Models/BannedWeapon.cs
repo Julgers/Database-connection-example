@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 
-namespace CommunityServerAPI.Models;
+namespace DatabaseExample.Models;
 
 [PrimaryKey(nameof(Name))]
 public class BannedWeapon

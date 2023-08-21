@@ -27,15 +27,30 @@ namespace CommunityServerAPI.Migrations
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
-                name: "Player",
+                name: "GameServers",
                 columns: table => new
                 {
-                    steamId = table.Column<ulong>(type: "bigint unsigned", nullable: false),
-                    stats = table.Column<byte[]>(type: "longblob", nullable: true)
+                    Ip = table.Column<string>(type: "varchar(45)", nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Port = table.Column<ushort>(type: "smallint unsigned", nullable: false),
+                    Token = table.Column<string>(type: "longtext", nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4")
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Player", x => x.steamId);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "Player",
+                columns: table => new
+                {
+                    SteamId = table.Column<ulong>(type: "bigint unsigned", nullable: false),
+                    Stats = table.Column<byte[]>(type: "longblob", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Player", x => x.SteamId);
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
         }
@@ -45,6 +60,9 @@ namespace CommunityServerAPI.Migrations
         {
             migrationBuilder.DropTable(
                 name: "BannedWeapons");
+
+            migrationBuilder.DropTable(
+                name: "GameServers");
 
             migrationBuilder.DropTable(
                 name: "Player");
