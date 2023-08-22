@@ -4,7 +4,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DatabaseExample.Repositories;
 
-public sealed class GameServerRepository : IDisposable
+// Reminder that we use a composite key for this table
+public sealed class GameServerRepository : IRepository<GameServer, (IPAddress ip, ushort port, string token)>
 {
     private readonly DatabaseContext _context;
 
@@ -13,16 +14,33 @@ public sealed class GameServerRepository : IDisposable
         _context = context;
     }
 
-    public async Task<bool> Validate(IPAddress ipAddress, ushort port, string token)
+    public async Task CreateAsync(GameServer server)
     {
-        return await _context.GameServers.AnyAsync(
-            server => server.Ip == ipAddress && server.Port == port && server.Token == token);
+        _context.GameServers.Add(server);
+        await _context.SaveChangesAsync();
     }
 
-    public void Dispose()
+    public async Task DeleteAsync(GameServer server)
     {
-        _context.Dispose();
+        _context.GameServers.Remove(server);
+        await _context.SaveChangesAsync();
+    }
 
-        GC.SuppressFinalize(this);
+    public async Task UpdateAsync(GameServer server)
+    {
+        _context.GameServers.Update(server);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<bool> ExistsAsync((IPAddress ip, ushort port, string token) server)
+    {
+        return await _context.GameServers.AnyAsync(
+            s => server.ip == s.Ip && server.port == s.Port && server.token == s.Token);
+    }
+
+    public async Task<GameServer?> FindAsync((IPAddress ip, ushort port, string token) server)
+    {
+        return await _context.GameServers.FirstOrDefaultAsync(
+            s => server.ip == s.Ip && server.port == s.Port && server.token == s.Token);
     }
 }

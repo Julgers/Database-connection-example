@@ -32,9 +32,5 @@ public class DatabaseContext : DbContext
             .HasConversion(
                 s => s.SerializeToByteArray(),
                 s => new PlayerStats(s));
-
-        modelBuilder
-            .Entity<GameServer>()
-            .HasNoKey();
     }
 }

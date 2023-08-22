@@ -26,7 +26,8 @@ internal class MyGameServer : GameServer<MyPlayer>
 
         var words = message.Split(" ");
 
-        var bannedWeapons = _services.GetRequiredService<BannedWeaponRepository>();
+        using var scope = _services.CreateScope();
+        var bannedWeapons = scope.ServiceProvider.GetRequiredService<BannedWeaponRepository>();
 
         switch (words[0])
         {
@@ -47,7 +48,8 @@ internal class MyGameServer : GameServer<MyPlayer>
 
     public override async Task OnSavePlayerStats(ulong steamId, PlayerStats stats)
     {
-        var players = _services.GetRequiredService<PlayerRepository>();
+        using var scope = _services.CreateScope();
+        var players = scope.ServiceProvider.GetRequiredService<PlayerRepository>();
 
         var player = new ServerPlayer { SteamId = steamId, Stats = stats };
 
@@ -60,7 +62,8 @@ internal class MyGameServer : GameServer<MyPlayer>
 
     public override async Task OnPlayerJoiningToServer(ulong steamId, PlayerJoiningArguments args)
     {
-        var players = _services.GetRequiredService<PlayerRepository>();
+        using var scope = _services.CreateScope();
+        var players = scope.ServiceProvider.GetRequiredService<PlayerRepository>();
 
         // Here we try to get the player out of the database. Return a new PlayersStats() if null, otherwise
         // we will put player in a variable and return its stats.
@@ -74,7 +77,8 @@ internal class MyGameServer : GameServer<MyPlayer>
     public override async Task<OnPlayerSpawnArguments?> OnPlayerSpawning(MyPlayer player,
         OnPlayerSpawnArguments request)
     {
-        var bannedWeapons = _services.GetRequiredService<BannedWeaponRepository>();
+        using var scope = _services.CreateScope();
+        var bannedWeapons = scope.ServiceProvider.GetRequiredService<BannedWeaponRepository>();
 
         // Check if the it's in the banned weapons table, if so, we don't allow it.
         if (await bannedWeapons.ExistsAsync(request.Loadout.PrimaryWeapon.Tool.Name))

@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DatabaseExample.Repositories;
 
-public sealed class BannedWeaponRepository : IRepository<BannedWeapon, string>, IDisposable
+public sealed class BannedWeaponRepository : IRepository<BannedWeapon, string>
 {
     private readonly DatabaseContext _context;
 
@@ -39,12 +39,5 @@ public sealed class BannedWeaponRepository : IRepository<BannedWeapon, string>, 
     public async Task<BannedWeapon?> FindAsync(string weaponName)
     {
         return await _context.BannedWeapons.FirstOrDefaultAsync(w => w.Name == weaponName);
-    }
-
-    public void Dispose()
-    {
-        _context.Dispose();
-
-        GC.SuppressFinalize(this);
     }
 }

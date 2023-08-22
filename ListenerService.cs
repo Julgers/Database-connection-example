@@ -12,9 +12,8 @@ public sealed class ListenerService : IHostedService, IDisposable
 {
     /*
      * Since this is a hosted service, we can receive things like the IServiceProvider and ILogger in our constructor
-     * to use them here. We want the service provider to resolve our repository services, which is also why we pass it
-     * in the constructor of MyPlayer and MyGameServer. Since those services are transient, a new one will be created every
-     * time we request it via _services.GetRequiredService<>(), with a fresh DatabaseContext as well.
+     * to use them here. We want the service provider to create service scopes and resolve our repository services,
+     * which is also why we pass it in the constructor of MyPlayer and MyGameServer.
      */
 
     private readonly ServerListener<MyPlayer, MyGameServer> _listener;
@@ -53,9 +52,9 @@ public sealed class ListenerService : IHostedService, IDisposable
     private async Task<bool> OnValidateGameToken(IPAddress ip, ushort port, string token)
     {
         // We have a "whitelist" of IP + port + token entries in database.
-        // Validate() checks if the DB has any entries with exactly this ip, port and token.
+        // ExistsAsync checks if the DB has any entries with exactly this composite key of ip, port and token.
         var gameServers = _services.GetRequiredService<GameServerRepository>();
-        return await gameServers.Validate(ip, port, token);
+        return await gameServers.ExistsAsync((ip, port, token));
     }
 
     // Since this is an IHostedservice, here we tell it what to do when starting and (below) stopping the service.
