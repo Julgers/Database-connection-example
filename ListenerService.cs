@@ -53,7 +53,8 @@ public sealed class ListenerService : IHostedService, IDisposable
     {
         // We have a "whitelist" of IP + port + token entries in database.
         // ExistsAsync checks if the DB has any entries with exactly this composite key of ip, port and token.
-        var gameServers = _services.GetRequiredService<GameServerRepository>();
+        using var scope = _services.CreateScope();
+        var gameServers = scope.ServiceProvider.GetRequiredService<GameServerRepository>();
         return await gameServers.ExistsAsync((ip, port, token));
     }
 
