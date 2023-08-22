@@ -8,8 +8,15 @@ using LogLevel = BattleBitAPI.Common.LogLevel;
 
 namespace DatabaseExample;
 
-public class ListenerService : IHostedService, IDisposable
+public sealed class ListenerService : IHostedService, IDisposable
 {
+    /*
+     * Since this is a hosted service, we can receive things like the IServiceProvider and ILogger in our constructor
+     * to use them here. We want the service provider to resolve our repository services, which is also why we pass it
+     * in the constructor of MyPlayer and MyGameServer. Since those services are transient, a new one will be created every
+     * time we request it via _services.GetRequiredService<>(), with a fresh DatabaseContext as well.
+     */
+
     private readonly ServerListener<MyPlayer, MyGameServer> _listener;
     private readonly ILogger<ListenerService> _logger;
     private readonly IServiceProvider _services;
@@ -51,6 +58,7 @@ public class ListenerService : IHostedService, IDisposable
         return await gameServers.Validate(ip, port, token);
     }
 
+    // Since this is an IHostedservice, here we tell it what to do when starting and (below) stopping the service.
     public Task StartAsync(CancellationToken cancellationToken)
     {
         _listener.Start(IPAddress.Loopback, 29294);
@@ -65,6 +73,7 @@ public class ListenerService : IHostedService, IDisposable
         return Task.CompletedTask;
     }
 
+    // From IDisposable, make sure we dispose the listener when disposing this service.
     public void Dispose()
     {
         _listener.Dispose();

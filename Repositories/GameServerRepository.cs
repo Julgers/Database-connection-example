@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DatabaseExample.Repositories;
 
-public class GameServerRepository
+public sealed class GameServerRepository : IDisposable
 {
     private readonly DatabaseContext _context;
 
@@ -17,5 +17,12 @@ public class GameServerRepository
     {
         return await _context.GameServers.AnyAsync(
             server => server.Ip == ipAddress && server.Port == port && server.Token == token);
+    }
+
+    public void Dispose()
+    {
+        _context.Dispose();
+
+        GC.SuppressFinalize(this);
     }
 }

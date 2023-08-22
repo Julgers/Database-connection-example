@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DatabaseExample.Repositories;
 
-public class PlayerRepository : IRepository<ServerPlayer, ulong>
+public sealed class PlayerRepository : IRepository<ServerPlayer, ulong>, IDisposable
 {
     private readonly DatabaseContext _context;
 
@@ -38,5 +38,12 @@ public class PlayerRepository : IRepository<ServerPlayer, ulong>
     public async Task<ServerPlayer?> FindAsync(ulong steamId)
     {
         return await _context.Player.FirstOrDefaultAsync(p => p.SteamId == steamId);
+    }
+
+    public void Dispose()
+    {
+        _context.Dispose();
+
+        GC.SuppressFinalize(this);
     }
 }
